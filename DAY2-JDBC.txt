@@ -1,0 +1,299 @@
+-->public class EmpData {															
+    private int employeeId;															
+    private String name;															
+    private String title;															
+    private String address;															
+    private String homePhone;											
+    public EmpData(int employeeId, String name, String title, String address, String homePhone) {															
+        this.employeeId = employeeId;															
+        this.name = name;															
+        this.title = title;															
+        this.address = address;															
+        this.homePhone = homePhone;															
+    }												
+    public int getEmployeeId() {															
+        return employeeId;															
+    }
+    public void setEmployeeId(int employeeId) {															
+        this.employeeId = employeeId;															
+    }
+    public String getName() {															
+        return name;															
+    }
+    public void setName(String name) {															
+        this.name = name;															
+    }	
+    public String getTitle() {															
+        return title;															
+    }	
+    public void setTitle(String title) {															
+        this.title = title;															
+    }
+    public String getAddress() {															
+        return address;															
+    }	
+    public void setAddress(String address) {															
+        this.address = address;															
+    }	
+    public String getHomePhone() {															
+        return homePhone;															
+    }
+    public void setHomePhone(String homePhone) {															
+        this.homePhone = homePhone;															
+    }
+}
+-->import java.sql.Connection;					
+import java.sql.PreparedStatement;					
+import java.sql.ResultSet;					
+import java.sql.SQLException;					
+import java.util.ArrayList;					
+import java.util.List;					
+					
+public class RowsFetcher {					
+    private int rowsPerPage = 5;					
+					
+    // Constructor					
+    public RowsFetcher() {					
+    }					
+					
+    public RowsFetcher(int rowsPerPage) {					
+        this.rowsPerPage = rowsPerPage;					
+    }					
+					
+    public int getRowsPerPage() {					
+        return rowsPerPage;					
+    }					
+					
+    public void setRowsPerPage(int rowsPerPage) {					
+        this.rowsPerPage = rowsPerPage;					
+    }					
+					
+    public List<EmpData> getRowsPerPage(Connection connection, int pageNumber) throws SQLException {					
+        List<EmpData> empDataList = new ArrayList<>();					
+        int startRow = (pageNumber - 1) * rowsPerPage;					
+					
+        String query = "SELECT * FROM employee LIMIT ?, ?";					
+        try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {					
+            preparedStatement.setInt(1, startRow);					
+            preparedStatement.setInt(2, rowsPerPage);					
+					
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {					
+                while (resultSet.next()) {					
+                    EmpData empData = new EmpData(					
+                            resultSet.getInt("employeeId"),					
+                            resultSet.getString("name"),					
+                            resultSet.getString("title"),					
+                            resultSet.getString("address"),					
+                            resultSet.getString("homePhone")					
+                    );					
+                    empDataList.add(empData);					
+                }					
+            }					
+        }					
+					
+        return empDataList;					
+    }					
+}
+-->import java.sql.Connection;					
+import java.sql.DriverManager;					
+import java.sql.SQLException;					
+import java.util.InputMismatchException;					
+import java.util.List;					
+import java.util.Scanner;					
+					
+public class DisplayUI {					
+    public static void displayRowsPerPage(Connection connection) {					
+        try (Scanner scanner = new Scanner(System.in)) {					
+            RowsFetcher rowsFetcher = new RowsFetcher(7);					
+            int pageNumber = 1;					
+            while (true) {					
+                System.out.println("Page Number: " + pageNumber);					
+                List<EmpData> empDataList = rowsFetcher.getRowsPerPage(connection, pageNumber);					
+                if (empDataList.isEmpty()) {					
+                    System.out.println("No more records to display.");					
+                    break;					
+                }					
+					
+                System.out.println("EmployeeId\tName\tTitle\tAddress\tHomePhone");					
+                for (EmpData empData : empDataList) {					
+                    System.out.println(empData.getEmployeeId() + "\t" + empData.getName() + "\t" +					
+                            empData.getTitle() + "\t" + empData.getAddress() + "\t" + empData.getHomePhone());					
+                }					
+					
+                System.out.println("Options: N - Next Page, P - Previous Page, X - Exit");					
+                String option = scanner.nextLine().toUpperCase();					
+					
+                switch (option) {					
+                    case "N":					
+                        pageNumber++;					
+                        break;					
+                    case "P":					
+                        if (pageNumber > 1) {					
+                            pageNumber--;					
+                        } else {					
+                            System.out.println("Already at the first page.");					
+                        }					
+                        break;					
+                    case "X":					
+                        System.out.println("Exiting...");					
+                        return;					
+                    default:					
+                        System.out.println("Invalid option. Please try again.");					
+                }					
+            }					
+        } catch (SQLException | InputMismatchException e) {					
+            e.printStackTrace();					
+        }					
+    }					
+					
+    public static void main(String[] args) {					
+        String url = "jdbc:mysql://localhost:3306/Northwind";					
+        String username = "root";					
+        String password = "root"; // Consider using more secure methods for storing passwords					
+					
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {					
+            displayRowsPerPage(connection);					
+        } catch (SQLException e) {					
+            e.printStackTrace();					
+        }					
+    }					
+}
+-->import java.sql.CallableStatement;										
+import java.sql.Connection;										
+import java.sql.ResultSet;										
+import java.sql.SQLException;										
+import java.util.ArrayList;										
+import java.util.List;										
+										
+public class SalesByCategoryRunner {										
+    private int rowsPerPage = 5;										
+										
+    // Constructor										
+    public SalesByCategoryRunner() {										
+    }										
+										
+    public SalesByCategoryRunner(int rowsPerPage) {										
+        this.rowsPerPage = rowsPerPage;										
+    }										
+										
+    public int getRowsPerPage() {										
+        return rowsPerPage;										
+    }										
+										
+    public void setRowsPerPage(int rowsPerPage) {										
+        this.rowsPerPage = rowsPerPage;										
+    }										
+										
+    public List<SalesByCatData> fetchRecords(Connection connection, String categoryName, int orderYear) throws SQLException {										
+        List<SalesByCatData> salesByCatDataList = new ArrayList<>();										
+										
+        try (CallableStatement callableStatement = connection.prepareCall("{call SalesByCategory(?, ?)}")) {										
+            callableStatement.setString(1, categoryName);										
+            callableStatement.setInt(2, orderYear);										
+            try (ResultSet resultSet = callableStatement.executeQuery()) {										
+                while (resultSet.next()) {										
+                    SalesByCatData data = new SalesByCatData(										
+                            resultSet.getString("ProductName"),										
+                            resultSet.getDouble("TotalPurchase")										
+                    );										
+                    salesByCatDataList.add(data);										
+                }										
+            }										
+        }										
+        return salesByCatDataList;										
+    }										
+}
+-->public class SalesByCatData {		
+    private String productName;		
+    private double totalPurchase;				
+    public SalesByCatData(String productName, double totalPurchase) {		
+        this.productName = productName;		
+        this.totalPurchase = totalPurchase;		
+    }		
+    public String getProductName() {		
+        return productName;		
+    }		
+		
+    public void setProductName(String productName) {		
+        this.productName = productName;		
+    }		
+		
+    public double getTotalPurchase() {		
+        return totalPurchase;		
+    }		
+		
+    public void setTotalPurchase(double totalPurchase) {		
+        this.totalPurchase = totalPurchase;		
+    }		
+}
+-->import java.sql.Connection;								
+import java.sql.DriverManager;								
+import java.sql.SQLException;								
+import java.util.InputMismatchException;								
+import java.util.List;								
+import java.util.Scanner;								
+								
+public class DataDisplayer {								
+    public static void displayRowsPerPage(Connection connection) {								
+        try (Scanner scanner = new Scanner(System.in)) {								
+            SalesByCategoryRunner runner = new SalesByCategoryRunner(7);								
+            System.out.println("Displaying records for Order Year = 1996 and Category name = Seafood:");								
+            displayRecords(runner, connection, "Seafood", 1996, scanner);								
+								
+            System.out.println("\nDisplaying records for Order Year = 1996 and Category name = Product:");								
+            displayRecords(runner, connection, "Produce", 1996, scanner);								
+        } catch (SQLException | InputMismatchException e) {								
+            e.printStackTrace();								
+        }								
+    }								
+								
+    private static void displayRecords(SalesByCategoryRunner runner, Connection connection, String categoryName, int orderYear, Scanner scanner) throws SQLException {								
+        int pageNumber = 1;								
+        while (true) {								
+            System.out.println("Page Number: " + pageNumber);								
+            List<SalesByCatData> salesByCatDataList = runner.fetchRecords(connection, categoryName, orderYear);								
+            if (salesByCatDataList.isEmpty()) {								
+                System.out.println("No more records to display.");								
+                break;								
+            }								
+								
+            System.out.println("ProductName\tTotalPurchase");								
+            for (SalesByCatData data : salesByCatDataList) {								
+                System.out.println(data.getProductName() + "\t" + data.getTotalPurchase());								
+            }								
+								
+            System.out.println("Options: N - Next Page, P - Previous Page, X - Exit");								
+            String option = scanner.nextLine().toUpperCase();								
+								
+            switch (option) {								
+                case "N":								
+                    pageNumber++;								
+                    break;								
+                case "P":								
+                    if (pageNumber > 1) {								
+                        pageNumber--;								
+                    } else {								
+                        System.out.println("Already at the first page.");								
+                    }								
+                    break;								
+                case "X":								
+                    System.out.println("Exiting...");								
+                    return;								
+                default:								
+                    System.out.println("Invalid option. Please try again.");								
+            }								
+        }								
+    }								
+								
+    public static void main(String[] args) {								
+        String url = "jdbc:mysql://localhost:3306/Northwind";								
+        String username = "root";								
+        String password = "root"; // Consider using more secure methods for storing passwords								
+								
+        try (Connection connection = DriverManager.getConnection(url, username, password)) {								
+            displayRowsPerPage(connection);								
+        } catch (SQLException e) {								
+            e.printStackTrace();								
+        }								
+    }								
+}
